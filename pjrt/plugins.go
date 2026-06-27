@@ -161,6 +161,17 @@ func (p *Plugin) IsCPU() bool {
 	return strings.Contains(strings.ToUpper(p.name), "CPU")
 }
 
+// IsROCm attempts to guess if the plugin is based on AMD ROCm.
+// It's not perfect.
+func (p *Plugin) IsROCm() bool {
+	return isRocm(p.name)
+}
+
+// isRocm tries to guess if the plugin name is associated with AMD ROCm.
+func isRocm(name string) bool {
+	return strings.Contains(strings.ToLower(name), "rocm")
+}
+
 // String implements fmt.Stringer. It returns the platform and version of the plugin.
 func (p *Plugin) String() string {
 	major, minor := p.Version()
