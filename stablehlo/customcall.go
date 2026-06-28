@@ -11,6 +11,12 @@ import (
 // attention custom-calls use.
 const CustomCallAPIVersionStatusReturning = 2
 
+// CustomCallAPIVersionTypedFFI is XLA custom-call API version 4: the typed XLA
+// FFI interface.  Use this when the handler was registered via
+// Plugin.RegisterFFIHandler (i.e. an XLA_FFI_Handler* from
+// XLA_FFI_DEFINE_HANDLER_SYMBOL).
+const CustomCallAPIVersionTypedFFI = 4
+
 // CustomCall emits a stablehlo.custom_call to the named target (e.g.
 // "__cudnn$fmhaSoftmax").
 //

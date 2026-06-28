@@ -270,6 +270,74 @@ PJRT_DEFINE_STRUCT_TRAITS(PJRT_Plugin_Attributes_Args, num_attributes);
 // `stablehlo_minimum_version`.
 typedef PJRT_Error* PJRT_Plugin_Attributes(PJRT_Plugin_Attributes_Args* args);
 
+// -------------------------------- FFI Extension ------------------------------
+// Copied verbatim from xla/pjrt/c/pjrt_c_api_ffi_extension.h (OpenXLA main).
+// Allows Go-side code to walk extension_start and register XLA FFI handlers.
+
+#define PJRT_API_FFI_EXTENSION_VERSION 3
+
+typedef struct PJRT_FFI_Type_Info {
+  void (*deleter)(void* object);
+  void (*serialize)();    // placeholder for future use
+  void (*deserialize)();  // placeholder for future use
+} PJRT_FFI_Type_Info;
+
+typedef struct PJRT_FFI_Type_Register_Args {
+  size_t struct_size;
+  PJRT_Extension_Base* extension_start;
+  const char* type_name;
+  size_t type_name_size;
+  int64_t type_id;  // in-out
+  PJRT_FFI_Type_Info* type_info;
+} PJRT_FFI_Type_Register_Args;
+PJRT_DEFINE_STRUCT_TRAITS(PJRT_FFI_Type_Register_Args, type_info);
+
+typedef PJRT_Error* PJRT_FFI_Type_Register(PJRT_FFI_Type_Register_Args* args);
+
+typedef struct PJRT_FFI_UserData {
+  int64_t type_id;
+  void* data;
+} PJRT_FFI_UserData;
+
+typedef struct PJRT_ExecuteContext PJRT_ExecuteContext;
+
+struct PJRT_FFI_UserData_Add_Args {
+  size_t struct_size;
+  PJRT_Extension_Base* extension_start;
+  PJRT_ExecuteContext* context;
+  PJRT_FFI_UserData user_data;
+};
+PJRT_DEFINE_STRUCT_TRAITS(PJRT_FFI_UserData_Add_Args, user_data);
+
+typedef PJRT_Error* PJRT_FFI_UserData_Add(PJRT_FFI_UserData_Add_Args* args);
+
+typedef enum PJRT_FFI_Handler_TraitsBits {
+  PJRT_FFI_HANDLER_TRAITS_COMMAND_BUFFER_COMPATIBLE = 1u << 0,
+} PJRT_FFI_Handler_TraitsBits;
+
+// Note: no extension_start field -- matches upstream ABI exactly.
+struct PJRT_FFI_Register_Handler_Args {
+  size_t struct_size;
+  const char* target_name;
+  size_t target_name_size;
+  void* handler;  // XLA_FFI_Handler* for typed FFI calls
+  const char* platform_name;
+  size_t platform_name_size;
+  PJRT_FFI_Handler_TraitsBits traits;
+};
+PJRT_DEFINE_STRUCT_TRAITS(PJRT_FFI_Register_Handler_Args, traits);
+
+typedef PJRT_Error* PJRT_FFI_Register_Handler(
+    PJRT_FFI_Register_Handler_Args* args);
+
+typedef struct PJRT_FFI_Extension {
+  PJRT_Extension_Base base;
+  PJRT_FFI_Type_Register* type_register;
+  PJRT_FFI_UserData_Add* user_data_add;
+  PJRT_FFI_Register_Handler* register_handler;
+} PJRT_FFI_Extension;
+PJRT_DEFINE_STRUCT_TRAITS(PJRT_FFI_Extension, register_handler);
+
 // ---------------------------------- Events -----------------------------------
 
 // Represents a notifying event that may be returned by PJRT APIs that enqueue
