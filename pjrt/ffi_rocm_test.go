@@ -25,12 +25,6 @@ package pjrt
 //	  FFI_PROBE_SO=/tmp/ffi_copy_probe.so \
 //	  go test -v -run TestRegisterFFIHandlerDispatches -plugin rocm ./pjrt/
 
-/*
-#cgo LDFLAGS: -ldl
-#include <dlfcn.h>
-#include <stdlib.h>
-*/
-import "C"
 import (
 	"os"
 	"testing"
@@ -50,33 +44,25 @@ func probeSOPath() string {
 	return "/tmp/ffi_copy_probe.so"
 }
 
-// loadProbeHandler dlopen-s the probe .so, resolves the "CopyProbe" symbol
-// (an XLA_FFI_Handler*), and returns it as unsafe.Pointer.
-// Skips the test with t.Skip if the .so is missing.
-// The caller must call C.dlclose(handle) when done.
-func loadProbeHandler(t *testing.T) (handle unsafe.Pointer, handler unsafe.Pointer) {
+// loadProbeHandler dlopen-s the probe .so and resolves the "CopyProbe" symbol
+// (an XLA_FFI_Handler*), returned as unsafe.Pointer. Skips the test if the .so is
+// missing. The caller must Close the returned handle when done. The dlopen lives
+// in dlopenGlobal (non-test file) because Go rejects `import "C"` in test files.
+func loadProbeHandler(t *testing.T) (handle *linuxDLLHandle, handler unsafe.Pointer) {
 	t.Helper()
 	soPath := probeSOPath()
-	cPath := C.CString(soPath)
-	defer cFree(cPath)
-
-	handle = C.dlopen(cPath, C.RTLD_LAZY|C.RTLD_GLOBAL)
-	if handle == nil {
-		t.Skipf("ffi_copy_probe.so not found at %s (build it first — see test doc comment): %s",
-			soPath, C.GoString(C.dlerror()))
+	handle, err := dlopenGlobal(soPath)
+	if err != nil {
+		t.Skipf("ffi_copy_probe.so not loadable at %s (build it first — see test doc comment): %v", soPath, err)
 	}
-
-	symC := C.CString("CopyProbe")
-	defer cFree(symC)
-	C.dlerror()
-	handler = C.dlsym(handle, symC)
-	if e := C.dlerror(); e != nil {
-		C.dlclose(handle)
-		t.Fatalf("dlsym CopyProbe in %s: %s", soPath, C.GoString(e))
+	handler, err = handle.GetSymbolPointer("CopyProbe")
+	if err != nil {
+		_ = handle.Close()
+		t.Fatalf("resolve CopyProbe in %s: %v", soPath, err)
 	}
 	if handler == nil {
-		C.dlclose(handle)
-		t.Fatalf("dlsym CopyProbe returned nil in %s", soPath)
+		_ = handle.Close()
+		t.Fatalf("CopyProbe resolved to nil in %s", soPath)
 	}
 	return handle, handler
 }
@@ -87,7 +73,7 @@ func TestRegisterFFIHandlerDispatches(t *testing.T) {
 	}
 
 	handle, handlerPtr := loadProbeHandler(t)
-	defer C.dlclose(handle)
+	defer func() { _ = handle.Close() }()
 
 	plugin, err := GetPlugin(*FlagPluginName)
 	requireNoError(t, err, "GetPlugin rocm")

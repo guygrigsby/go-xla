@@ -211,6 +211,22 @@ func (l *linuxDLLHandle) Close() error {
 	return nil
 }
 
+// dlopenGlobal dlopens soPath with RTLD_LAZY|RTLD_GLOBAL and returns a handle for
+// symbol lookup. Unlike loadPlugin it does not require the PJRT API symbol, so it
+// can load a standalone FFI-handler .so. RTLD_GLOBAL so the handler's symbols are
+// visible to the plugin that dispatches to it. Lives outside _test.go because Go
+// rejects `import "C"` in test files.
+func dlopenGlobal(soPath string) (*linuxDLLHandle, error) {
+	nameC := C.CString(soPath)
+	defer C.free(unsafe.Pointer(nameC))
+	C.dlerror()
+	handle := C.dlopen(nameC, C.RTLD_LAZY|C.RTLD_GLOBAL)
+	if handle == nil {
+		return nil, errors.Errorf("dlopen %q: %s", soPath, C.GoString(C.dlerror()))
+	}
+	return &linuxDLLHandle{Handle: handle, Name: soPath}, nil
+}
+
 // SuppressAbseilLoggingHack prevents some irrelevant logging from PJRT plugins by duplicating the file descriptor (fd) 2,
 // reassigning the new fd to Go's os.Stderr, and then closing fd 2, so PJRT plugins won't be able to write anything.
 //
