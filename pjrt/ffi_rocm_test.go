@@ -15,7 +15,7 @@ package pjrt
 //	  -I $ROCM_SDK/include \
 //	  -o /tmp/ffi_copy_probe.so \
 //	  <repo>/compute/xla/testdata/ffi_copy_probe.cc \
-//	  -L $ROCM_SDK/lib -lamdhip64
+//	  -L $ROCM_SDK/lib -l:libamdhip64.so.7  # wheel ships only the versioned .so, no -lamdhip64 symlink
 //
 // Run on the GPU machine (wrap in gputex for the GPU lock):
 //
